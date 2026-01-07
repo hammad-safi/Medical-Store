@@ -1,44 +1,34 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Toast from "@/components/ui/toast";
 import { DataTableHeader } from "@/components/data-table";
-import DataTableActions from "@/components/data-table/tableAction";
 import DataTable from "@/components/data-table/dataTable";
 import { AddSaleModal } from "./AddSaleModal";
 import { ViewSaleModal } from "./ViewSaleModal";
 import { useAuth } from "@/app/hooks/useAuth";
 import api from "@/app/lib/axios";
-import { Sale, ToastType } from "@/components/types";
+import { ToastType } from "@/components/types";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader } from "lucide-react";
+import { useSalesData } from "@/app/hooks/useApiData";
 
+/* ================= TYPES ================= */
 interface SaleItem {
-  inventoryId: {
-    _id: string;
-    name: string;
-    category: string;
-  };
   productName: string;
   quantity: number;
   unitPrice: number;
-  total: number;
 }
 
 interface Seller {
   _id: string;
   fullName: string;
-  email: string;
 }
 
-interface ExtendedSale {
+export interface Sale {
   _id: string;
   invoiceNumber: string;
-  productName?: string;
-  unitPrice?: number;
-  quantity?: number;
-  totalAmount?: number;
-  discountAmount?: number;
-  taxAmount?: number;
   items: SaleItem[];
   subtotal: number;
   discount: number;
@@ -46,108 +36,129 @@ interface ExtendedSale {
   grandTotal: number;
   paymentMethod: string;
   customerName: string;
-  customerPhone: string;
-  sellerId: Seller;
   createdAt: string;
+  sellerId: Seller;
 }
 
+// Custom hook for sales operations
+const useSales = (page: number = 1, limit: number = 10, search: string = "") => {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Use app data hook for sales
+  const {
+    sales: allSales,
+    isLoading,
+    isFetching,
+    isPreviousData,
+    refetch: refetchSales
+  } = useSalesData();
+
+  // Add sale mutation
+  const addSaleMutation = useMutation({
+    mutationFn: async (saleData: any) => {
+      const res = await api.post("/sales", saleData);
+      return res.data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app-data'] });
+    },
+  });
+
+  // Delete sales mutation
+  const deleteSalesMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await api.delete("/sales", { data: { ids } });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['app-data'] });
+    },
+  });
+
+  // Filter and paginate sales locally
+  const filteredSales = useMemo(() => {
+    return allSales.filter(sale => {
+      const productNames = sale.items?.map(item => item.productName).join(", ") || "";
+      return (
+        (sale.customerName?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        (sale.invoiceNumber?.toLowerCase() || "").includes(search.toLowerCase()) ||
+        productNames.toLowerCase().includes(search.toLowerCase())
+      );
+    });
+  }, [allSales, search]);
+
+  // Sort by date (newest first)
+  const sortedSales = useMemo(() => {
+    return [...filteredSales].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [filteredSales]);
+
+  // Apply pagination
+  const paginatedSales = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    return sortedSales.slice(startIndex, endIndex);
+  }, [sortedSales, page, limit]);
+
+  return {
+    sales: paginatedSales,
+    pagination: {
+      page,
+      limit,
+      total: filteredSales.length,
+      pages: Math.ceil(filteredSales.length / limit)
+    },
+    isLoading,
+    isFetching,
+    isPreviousData,
+    refetch: refetchSales,
+    addSale: addSaleMutation,
+    deleteSales: deleteSalesMutation,
+  };
+};
+
+/* ================= PAGE ================= */
 export default function SalesPage() {
   const router = useRouter();
-  const { token, user } = useAuth();
-  const [sales, setSales] = useState<ExtendedSale[]>([]);
+  const { token } = useAuth();
+
+  // Local state
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState("date");
-  const [filterPayment, setFilterPayment] = useState("");
   const [toast, setToast] = useState<ToastType | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
-  const [viewSale, setViewSale] = useState<ExtendedSale | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0
-  });
+  const [viewSale, setViewSale] = useState<Sale | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+  // React Query hooks
+  const {
+    sales,
+    pagination,
+    isLoading,
+    isFetching,
+    isPreviousData,
+    refetch,
+    addSale,
+    deleteSales,
+  } = useSales(currentPage, itemsPerPage, search);
+
+  /* ================= HELPERS ================= */
+  const showToast = (message: string, type: ToastType["type"] = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  useEffect(() => {
-    if (!token && !user) {
-      router.push("/login");
-    }
-  }, [token, user, router]);
+  // Redirect if not authenticated
+  if (!token) {
+    router.push("/login");
+    return null;
+  }
 
-  const fetchSales = async (page = 1) => {
-    if (!token) return;
-    
-    setLoading(true);
-    try {
-      const res = await api.get(`/sales?page=${page}&limit=10`);
-      console.log("Sales API Response:", res.data); // Debug log
-      
-      // Check if data structure matches your GET response
-      if (res.data?.data?.sales && Array.isArray(res.data.data.sales)) {
-        setSales(res.data.data.sales);
-        if (res.data.data.pagination) {
-          setPagination(res.data.data.pagination);
-        }
-      } else if (Array.isArray(res.data?.data)) {
-        // Fallback for different API structure
-        setSales(res.data.data);
-      } else if (Array.isArray(res.data)) {
-        // Another fallback
-        setSales(res.data);
-      } else {
-        console.warn("Unexpected API response format:", res.data);
-        setSales([]);
-      }
-    } catch (err: any) {
-      console.error("Error fetching sales:", err);
-      const errorMessage = err.response?.data?.message || "Failed to fetch sales";
-      showToast(errorMessage, "error");
-      
-      setSales([]);
-      
-      if (err.response?.status === 401) {
-        setTimeout(() => router.push("/login"), 2000);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (token) {
-      fetchSales();
-    }
-  }, [token]);
-
-  const handleDelete = async () => {
-    if (!selected.length || !token) return;
-
-    setDeleteLoading(true);
-    try {
-      await api.delete("/sales", {
-        data: { ids: selected },
-      });
-      showToast(`${selected.length} sale${selected.length > 1 ? 's' : ''} deleted successfully`);
-      setSelected([]);
-      fetchSales(); // Refresh sales list
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || "Delete failed";
-      showToast(errorMessage, "error");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
+  /* ================= HANDLERS ================= */
   const handleAddSale = async (saleData: any) => {
     if (!token) {
       showToast("Please login first", "error");
@@ -155,27 +166,27 @@ export default function SalesPage() {
     }
 
     try {
-      console.log("Submitting sale data:", saleData); // Debug log
-      const response = await api.post("/sales", saleData);
-      console.log("Sale POST response:", response.data); // Debug log
-      
-      if (response.data?.success) {
-        showToast(response.data.message || "Sale recorded successfully");
-        setModalOpen(false);
-        
-        // IMPORTANT: Refresh the sales list immediately
-        await fetchSales(1); // Go back to page 1 to see the new sale
-        
-        // Return the created sale for invoice printing
-        return response.data.data;
-      } else {
-        throw new Error(response.data?.message || "Failed to record sale");
-      }
+      const result = await addSale.mutateAsync(saleData);
+      showToast("Sale recorded successfully", "success");
+      setModalOpen(false);
+      return result;
     } catch (err: any) {
-      console.error("Error adding sale:", err);
       const errorMessage = err.response?.data?.message || err.message || "Failed to record sale";
       showToast(errorMessage, "error");
       throw err;
+    }
+  };
+
+  const handleDeleteSales = async () => {
+    if (!selected.length || !token) return;
+
+    try {
+      await deleteSales.mutateAsync(selected);
+      showToast(`${selected.length} sale${selected.length > 1 ? 's' : ''} deleted successfully`);
+      setSelected([]);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || "Delete failed";
+      showToast(errorMessage, "error");
     }
   };
 
@@ -184,100 +195,99 @@ export default function SalesPage() {
     window.open(invoiceUrl, '_blank');
   };
 
-  const handleEdit = (sale: ExtendedSale) => {
-    handleView(sale);
-  };
-
-  const handleView = (sale: ExtendedSale) => {
+  const handleView = (sale: Sale) => {
     setViewSale(sale);
     setViewOpen(true);
   };
 
-  const getProductNames = (sale: ExtendedSale): string => {
-    if (sale.items && sale.items.length > 0) {
-      return sale.items.map(item => item.productName).join(", ");
-    }
-    return sale.productName || "Multiple Products";
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
-  const getTotalQuantity = (sale: ExtendedSale): number => {
-    if (sale.items && sale.items.length > 0) {
-      return sale.items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    }
-    return sale.quantity || 0;
+  const handleItemsPerPageChange = (limit: number) => {
+    setItemsPerPage(limit);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
-  const filtered = useMemo(() => {
-    if (!Array.isArray(sales)) {
-      return [];
+  const handleExport = () => {
+    try {
+      const headers = ["Invoice #", "Customer", "Products", "Quantity", "Subtotal", "Discount", "Tax", "Grand Total", "Payment", "Date", "Seller"];
+      
+      const csvData = sales.map(sale => {
+        const productNames = sale.items?.map(item => item.productName).join(", ") || "N/A";
+        const totalQuantity = sale.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        
+        return [
+          sale.invoiceNumber || "",
+          sale.customerName || "Walk-in Customer",
+          productNames,
+          totalQuantity,
+          `$${(sale.subtotal || 0).toFixed(2)}`,
+          `${sale.discount || 0}%`,
+          `${sale.tax || 0}%`,
+          `$${(sale.grandTotal || 0).toFixed(2)}`,
+          sale.paymentMethod || "Cash",
+          sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "",
+          sale.sellerId?.fullName || ""
+        ];
+      });
+      
+      const csvContent = [
+        headers.join(","),
+        ...csvData.map(row => row.join(","))
+      ].join("\n");
+      
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sales_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      showToast("Export completed successfully", "success");
+    } catch (error) {
+      showToast("Export failed", "error");
     }
-    
-    let result = sales.filter((sale) => {
-      const productNames = getProductNames(sale);
-      return (
-        (sale.customerName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (sale.invoiceNumber?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        productNames.toLowerCase().includes(search.toLowerCase())
-      );
-    });
+  };
 
-    if (filterPayment) {
-      result = result.filter(sale => sale.paymentMethod === filterPayment);
-    }
+  /* ================= DATA TRANSFORMATIONS ================= */
+  const tableData = useMemo(() => 
+    sales.map(sale => ({
+      ...sale,
+      productName: sale.items?.map(item => item.productName).join(", ") || "N/A",
+      quantity: sale.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+      grandTotal: sale.grandTotal || 0,
+      createdAt: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A",
+      customerName: sale.customerName || "Walk-in Customer",
+    })), 
+    [sales]
+  );
 
-    result.sort((a, b) => {
-      if (sortBy === "date") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      if (sortBy === "total") {
-        return b.grandTotal - a.grandTotal;
-      }
-      if (sortBy === "customer") {
-        return (a.customerName || "").localeCompare(b.customerName || "");
-      }
-      if (sortBy === "invoice") {
-        return (a.invoiceNumber || "").localeCompare(b.invoiceNumber || "");
-      }
-      return 0;
-    });
+  const totalRevenue = useMemo(() => 
+    sales.reduce((sum, sale) => sum + (sale.grandTotal || 0), 0), 
+    [sales]
+  );
 
-    return result;
-  }, [sales, search, sortBy, filterPayment]);
+  const suggestions = useMemo(() => {
+    return sales.slice(0, 5).map(sale => ({
+      _id: sale._id,
+      name: sale.invoiceNumber || "N/A",
+      category: sale.customerName || "N/A"
+    }));
+  }, [sales]);
 
   const paymentMethods = ['Cash', 'Card', 'UPI', 'Credit'];
-  const totalRevenue = useMemo(() => 
-    Array.isArray(sales) ? sales.reduce((sum, sale) => sum + (sale.grandTotal || 0), 0) : 0
-  , [sales]);
 
-  const tableData = useMemo(() => {
-    return filtered.map(sale => ({
-      ...sale,
-      productName: getProductNames(sale),
-      quantity: getTotalQuantity(sale),
-      customerName: sale.customerName || "Walk-in Customer",
-      paymentMethod: sale.paymentMethod || "Cash",
-      createdAt: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A",
-      grandTotal: sale.grandTotal ? `$${sale.grandTotal.toFixed(2)}` : "$0.00",
-      // Add raw values for sorting
-      _raw: {
-        date: new Date(sale.createdAt).getTime(),
-        total: sale.grandTotal,
-        customer: sale.customerName || "",
-        invoice: sale.invoiceNumber || ""
-      }
-    }));
-  }, [filtered]);
-
-  const handlePageChange = (newPage: number) => {
-    fetchSales(newPage);
-  };
-
-  if (!token) {
+  /* ================= LOADING STATE ================= */
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Redirecting to login...</p>
+          <Loader className="w-12 h-12 text-blue-600 animate-spin mx-auto" />
+          <p className="mt-4 text-gray-600">Loading sales...</p>
         </div>
       </div>
     );
@@ -285,114 +295,51 @@ export default function SalesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-green-50 p-4 md:p-6 space-y-6">
-      {loading && (
+      {/* Cached data indicator */}
+      {isPreviousData && (
+        <div className="fixed top-4 right-4 z-50 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2 shadow-lg animate-pulse">
+          <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+          <span className="text-yellow-800 text-sm font-medium">Updating sales data...</span>
+        </div>
+      )}
+
+      {/* Global loading overlay */}
+      {(addSale.isPending || deleteSales.isPending || isFetching) && (
         <div className="fixed inset-0 bg-black/10 z-40 flex items-center justify-center">
           <div className="bg-white p-6 rounded-xl shadow-lg flex items-center gap-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-            <span className="text-gray-700">Loading sales...</span>
+            <Loader className="w-6 h-6 text-blue-600 animate-spin" />
+            <span className="text-gray-700">
+              {addSale.isPending ? "Recording sale..." :
+               deleteSales.isPending ? "Deleting sales..." :
+               "Refreshing sales..."}
+            </span>
           </div>
         </div>
       )}
 
+      {/* Data Table Header */}
       <DataTableHeader
         title="Sales"
         subtitle={`Total Revenue: $${totalRevenue.toFixed(2)} | Total Sales: ${pagination.total} | Page ${pagination.page} of ${pagination.pages}`}
         search={search}
         setSearch={setSearch}
-        suggestions={filtered}
+        suggestions={suggestions}
         onAdd={() => setModalOpen(true)}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        filterCategory={filterPayment}
-        setFilterCategory={setFilterPayment}
+        sortBy="date"
+        setSortBy={() => {}} // Not used in this component
+        filterCategory=""
+        setFilterCategory={() => {}} // Not used in this component
         categories={paymentMethods}
         showAddButton={true}
-        onExport={() => {
-          const headers = ["Invoice #", "Customer", "Products", "Quantity", "Subtotal", "Discount", "Tax", "Grand Total", "Payment", "Date", "Seller"];
-          const csvData = filtered.map(sale => [
-            sale.invoiceNumber || "",
-            sale.customerName || "",
-            getProductNames(sale),
-            getTotalQuantity(sale),
-            `$${(sale.subtotal || 0).toFixed(2)}`,
-            `${sale.discount || 0}%`,
-            `${sale.tax || 0}%`,
-            `$${(sale.grandTotal || 0).toFixed(2)}`,
-            sale.paymentMethod || "",
-            sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "",
-            sale.sellerId?.fullName || ""
-          ]);
-          
-          const csvContent = [
-            headers.join(","),
-            ...csvData.map(row => row.join(","))
-          ].join("\n");
-          
-          const blob = new Blob([csvContent], { type: "text/csv" });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `sales_${new Date().toISOString().split('T')[0]}.csv`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
-          
-          showToast("Export completed successfully", "success");
-        }}
+        onExport={handleExport}
+        selectedCount={selected.length}
+        onRefresh={refetch}
+        isRefreshing={isFetching}
+        onBulkDelete={selected.length > 0 ? handleDeleteSales : undefined}
       />
 
-      {/* <DataTableActions
-        search={search}
-        setSearch={setSearch}
-        suggestions={filtered}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        filterCategory={filterPayment}
-        setFilterCategory={setFilterPayment}
-        categories={paymentMethods}
-        selectedCount={selected.length}
-        onReload={() => fetchSales(pagination.page)}
-        onDelete={handleDelete}
-        deleteLoading={deleteLoading}
-        onExport={() => {
-          const headers = ["Invoice #", "Customer", "Products", "Quantity", "Subtotal", "Discount", "Tax", "Grand Total", "Payment", "Date", "Seller"];
-          const csvData = filtered.map(sale => [
-            sale.invoiceNumber || "",
-            sale.customerName || "",
-            getProductNames(sale),
-            getTotalQuantity(sale),
-            `$${(sale.subtotal || 0).toFixed(2)}`,
-            `${sale.discount || 0}%`,
-            `${sale.tax || 0}%`,
-            `$${(sale.grandTotal || 0).toFixed(2)}`,
-            sale.paymentMethod || "",
-            sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "",
-            sale.sellerId?.fullName || ""
-          ]);
-          
-          const csvContent = [
-            headers.join(","),
-            ...csvData.map(row => row.join(","))
-          ].join("\n");
-          
-          const blob = new Blob([csvContent], { type: "text/csv" });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `sales_${new Date().toISOString().split('T')[0]}.csv`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
-          
-          showToast("Export completed successfully", "success");
-        }}
-        pagination={pagination}
-        onPageChange={handlePageChange}
-      /> */}
-
-      {!loading && (!Array.isArray(sales) || sales.length === 0) ? (
+      {/* Empty state */}
+      {!isLoading && sales.length === 0 ? (
         <div className="bg-white rounded-xl border p-12 text-center">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
             <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -412,61 +359,76 @@ export default function SalesPage() {
           </button>
         </div>
       ) : (
-        <>
-          <DataTable
-            columns={[
-              { key: "invoiceNumber", label: "Invoice #" },
-              { key: "customerName", label: "Customer" },
-              { key: "productName", label: "Products" },
-              { key: "quantity", label: "Qty" },
-              { key: "grandTotal", label: "Total" },
-              { key: "paymentMethod", label: "Payment" },
-              { key: "createdAt", label: "Date" },
-            ]}
-            data={tableData}
-            selected={selected}
-            setSelected={setSelected}
-            onEdit={handleEdit}
-            onView={handleView}
-            showEdit={false}
-          />
-          
-          {/* Pagination Controls */}
-          {pagination.pages > 1 && (
-            <div className="flex justify-center items-center space-x-2 mt-4">
-              <button
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page <= 1}
-                className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Previous
-              </button>
-              
-              <span className="px-4 py-2">
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              
-              <button
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.pages}
-                className="px-4 py-2 bg-white border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </>
+        /* Data Table */
+        <DataTable
+          columns={[
+            { key: "invoiceNumber", label: "Invoice #", type: "text" },
+            { key: "customerName", label: "Customer", type: "text" },
+            { key: "productName", label: "Products", type: "text" },
+            { key: "quantity", label: "Qty", type: "number" },
+            { key: "grandTotal", label: "Total", type: "currency" },
+            { key: "paymentMethod", label: "Payment", type: "status" },
+            { key: "createdAt", label: "Date", type: "date" },
+          ]}
+          data={tableData}
+          selected={selected}
+          setSelected={setSelected}
+          onView={handleView}
+          onEdit={handleView} // Edit opens view modal
+          showEdit={false}
+          showRowMenu={true}
+          rowMenuItems={[
+            {
+              label: "View Details",
+              icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              ),
+              onClick: handleView
+            },
+            {
+              label: "Print Invoice",
+              icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+              ),
+              onClick: (sale) => handlePrintInvoice(sale._id)
+            },
+            {
+              label: "Delete",
+              icon: (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              ),
+              onClick: (sale) => {
+                setSelected([sale._id]);
+                setTimeout(() => handleDeleteSales(), 100);
+              },
+              variant: 'danger'
+            }
+          ]}
+          pagination={{
+            currentPage: pagination.page,
+            totalPages: pagination.pages,
+            totalItems: pagination.total,
+            itemsPerPage: pagination.limit,
+            onPageChange: handlePageChange,
+            onItemsPerPageChange: handleItemsPerPageChange,
+          }}
+        />
       )}
 
+      {/* Modals */}
       <AddSaleModal
         open={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setSelectedProduct(null);
-        }}
+        onClose={() => setModalOpen(false)}
         onSubmit={handleAddSale}
         onPrintInvoice={handlePrintInvoice}
-        preSelectedProduct={selectedProduct}
+        isSubmitting={addSale.isPending}
       />
 
       <ViewSaleModal
@@ -476,6 +438,7 @@ export default function SalesPage() {
         onPrintInvoice={handlePrintInvoice}
       />
 
+      {/* Toast Notifications */}
       {toast && (
         <Toast
           message={toast.message}

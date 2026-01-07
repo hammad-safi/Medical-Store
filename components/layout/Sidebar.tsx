@@ -20,8 +20,8 @@ const menuItems = [
   { name: "Purchase", path: "/dashboard/purchase", icon: ShoppingCart },
   { name: "Sales", path: "/dashboard/sales", icon: DollarSign },
   { name: "Suppliers", path: "/dashboard/suppliers", icon: Users },
-  { name: "Reports", path: "/reports", icon: BarChart3 },
-  { name: "Settings", path: "/settings", icon: Settings },
+  { name: "Reports", path: "/dashboard/reports", icon: BarChart3 },
+  // { name: "Settings", path: "/settings", icon: Settings },
 ];
 
 export default function Sidebar({
@@ -61,7 +61,7 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed lg:sticky top-0 left-0 h-screen z-50
+        className={`fixed lg:sticky max-w-50 top-0 left-0 h-screen z-50
         bg-gradient-to-b from-blue-900 to-blue-800 text-white
         transition-all duration-300
         ${collapsed ? "w-20" : "w-64"}
