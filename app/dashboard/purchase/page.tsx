@@ -1184,7 +1184,7 @@ export default function PurchasesPage() {
     try {
       const headers = ["Invoice #", "Supplier", "Total Items", "Subtotal", "Tax", "Shipping", "Grand Total", "Status", "Payment Status", "Date"];
       const csvData = purchases.map(purchase => {
-        const totalQuantity = purchase.items?.reduce((sum, item) => sum + item.quantity, 0) || purchase.totalQuantity || 0;
+        const totalQuantity = purchase.items?.reduce((sum: any, item: { quantity: any; }) => sum + item.quantity, 0) || purchase.totalQuantity || 0;
         const subtotal = purchase.subtotal || 0;
         const taxAmount = purchase.taxAmount || 0;
         const shippingCost = purchase.shippingCost || 0;
@@ -1272,7 +1272,7 @@ export default function PurchasesPage() {
     const totalSpent = purchases.reduce((sum, p) => sum + (p.grandTotal || 0), 0);
     const totalItems = purchases.reduce((sum, p) => {
       if (p.items) {
-        return sum + p.items.reduce((itemSum, item) => itemSum + item.quantity, 0);
+        return sum + p.items.reduce((itemSum: any, item: { quantity: any; }) => itemSum + item.quantity, 0);
       }
       return sum + (p.totalQuantity || 0);
     }, 0);
@@ -1285,7 +1285,7 @@ export default function PurchasesPage() {
   // Prepare table data
   const tableData = useMemo(() => {
     return purchases.map(p => {
-      const totalQuantity = p.items?.reduce((sum, item) => sum + item.quantity, 0) || p.totalQuantity || 0;
+      const totalQuantity = p.items?.reduce((sum: any, item: { quantity: any; }) => sum + item.quantity, 0) || p.totalQuantity || 0;
       const totalItemsCount = p.items?.length || 0;
       
       return {
@@ -1516,7 +1516,7 @@ export default function PurchasesPage() {
         open={viewOpen}
         onClose={() => setViewOpen(false)}
         data={viewPurchase}
-        onStatusUpdate={(id, status) => updatePurchaseStatus.mutateAsync({ id, status })}
+        onStatusUpdate={(id: any, status: any) => updatePurchaseStatus.mutateAsync({ id, status })}
       />
 
       {/* Toast Notifications */}

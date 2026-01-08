@@ -369,53 +369,53 @@ export default function SuppliersPage() {
               key: "name", 
               label: "Name", 
               type: "text",
-              cellRenderer: (value: string, row: Supplier) => (
-                <div className="font-medium text-gray-900">{value || "N/A"}</div>
-              )
+              // cellRenderer: (value: string, row: Supplier) => (
+              //   <div className="font-medium text-gray-900">{value || "N/A"}</div>
+              // )
             },
-            { 
-              key: "companyName", 
-              label: "Company", 
-              type: "text",
-              cellRenderer: (value: string) => (
-                <span className="text-gray-700">{value || "N/A"}</span>
-              )
-            },
+            // { 
+            //   key: "companyName", 
+            //   label: "Company", 
+            //   type: "text",
+            //   // cellRenderer: (value: string) => (
+            //   //   <span className="text-gray-700">{value || "N/A"}</span>
+            //   // )
+            // },
             { 
               key: "email", 
               label: "Email", 
               type: "text",
-              cellRenderer: (value: string) => (
-                <a 
-                  href={`mailto:${value}`} 
-                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {value || "N/A"}
-                </a>
-              )
+              // cellRenderer: (value: string) => (
+              //   <a 
+              //     href={`mailto:${value}`} 
+              //     className="text-blue-600 hover:text-blue-800 hover:underline"
+              //     onClick={(e) => e.stopPropagation()}
+              //   >
+              //     {value || "N/A"}
+              //   </a>
+              // )
             },
             { 
               key: "phone", 
               label: "Phone", 
               type: "text",
-              cellRenderer: (value: string) => (
-                <a 
-                  href={`tel:${value}`} 
-                  className="text-green-600 hover:text-green-800"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {value || "N/A"}
-                </a>
-              )
+              // cellRenderer: (value: string) => (
+              //   <a 
+              //     href={`tel:${value}`} 
+              //     className="text-green-600 hover:text-green-800"
+              //     onClick={(e) => e.stopPropagation()}
+              //   >
+              //     {value || "N/A"}
+              //   </a>
+              // )
             },
             { 
               key: "address", 
               label: "Address", 
               type: "text",
-              cellRenderer: (value: string) => (
-                <div className="truncate max-w-xs text-gray-600">{value || "N/A"}</div>
-              )
+              // cellRenderer: (value: string) => (
+              //   <div className="truncate max-w-xs text-gray-600">{value || "N/A"}</div>
+              // )
             },
           ]}
           data={suppliers.map(s => ({

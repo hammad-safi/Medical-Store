@@ -79,7 +79,7 @@ const useSales = (page: number = 1, limit: number = 10, search: string = "") => 
   // Filter and paginate sales locally
   const filteredSales = useMemo(() => {
     return allSales.filter(sale => {
-      const productNames = sale.items?.map(item => item.productName).join(", ") || "";
+      const productNames = sale.items?.map((item: { productName: any; }) => item.productName).join(", ") || "";
       return (
         (sale.customerName?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (sale.invoiceNumber?.toLowerCase() || "").includes(search.toLowerCase()) ||
@@ -214,8 +214,8 @@ export default function SalesPage() {
       const headers = ["Invoice #", "Customer", "Products", "Quantity", "Subtotal", "Discount", "Tax", "Grand Total", "Payment", "Date", "Seller"];
       
       const csvData = sales.map(sale => {
-        const productNames = sale.items?.map(item => item.productName).join(", ") || "N/A";
-        const totalQuantity = sale.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
+        const productNames = sale.items?.map((item: { productName: any; }) => item.productName).join(", ") || "N/A";
+        const totalQuantity = sale.items?.reduce((sum: any, item: { quantity: any; }) => sum + (item.quantity || 0), 0) || 0;
         
         return [
           sale.invoiceNumber || "",
@@ -257,8 +257,8 @@ export default function SalesPage() {
   const tableData = useMemo(() => 
     sales.map(sale => ({
       ...sale,
-      productName: sale.items?.map(item => item.productName).join(", ") || "N/A",
-      quantity: sale.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+      productName: sale.items?.map((item: { productName: any; }) => item.productName).join(", ") || "N/A",
+      quantity: sale.items?.reduce((sum: any, item: { quantity: any; }) => sum + item.quantity, 0) || 0,
       grandTotal: sale.grandTotal || 0,
       createdAt: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : "N/A",
       customerName: sale.customerName || "Walk-in Customer",

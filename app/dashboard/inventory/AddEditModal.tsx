@@ -76,6 +76,7 @@ export default function AddEditModal({ open, onClose, onSubmit, product }: Props
       costPrice: Number(form.costPrice) || 0,
       salePrice: Number(form.salePrice),
       expiry: form.expiry,
+      price: 0
     });
 
     onClose();

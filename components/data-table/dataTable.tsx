@@ -818,7 +818,7 @@ import { AlertCircle, Clock, Edit, Eye, Package, ShoppingCart, TrendingUp, MoreV
 import { useState } from "react";
 
 interface DataTableProps {
-  columns: { key: string; label: string; type?: 'text' | 'number' | 'date' | 'currency' | 'status' | 'action' }[];
+  columns: { key: string; label: string; type?: 'text' | 'number' | 'date' | 'currency' |'badge'| 'status' | 'action' }[];
   data: any[];
   selected: string[];
   setSelected: (ids: string[]) => void;

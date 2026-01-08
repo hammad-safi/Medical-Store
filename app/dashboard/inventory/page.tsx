@@ -1729,7 +1729,7 @@ export default function InventoryPage() {
           setSelectedProductForSale(null);
         }}
         onSubmit={handleAddSale}
-        onPrintInvoice={(saleId) => {
+        onPrintInvoice={(saleId: any) => {
           const invoiceUrl = `/api/sales/invoice/${saleId}`;
           window.open(invoiceUrl, '_blank');
         }}

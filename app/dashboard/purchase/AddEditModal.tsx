@@ -1211,7 +1211,7 @@ export function AddPurchaseModal({
   /* ---------------- HELPERS ---------------- */
   const updateItem = (index: number, key: keyof PurchaseItem, value: any) => {
     const updated = [...items];
-    updated[index][key] = value;
+    (updated[index] as any)[key] = value;
     setItems(updated);
   };
 

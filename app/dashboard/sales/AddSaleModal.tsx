@@ -1222,7 +1222,7 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
         item.unitPrice = price;
         item.total = item.quantity * price;
       } else {
-        item[field] = value;
+(item as any)[field] = value;
       }
 
       updatedItems[index] = item;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, JSX } from "react";
 import { useRouter } from "next/navigation";
 import { 
   DollarSign, 
@@ -19,11 +19,109 @@ import {
 import { useAuth } from "@/app/hooks/useAuth";
 import { useReportData } from "@/app/hooks/useApiData";
 
+interface Toast {
+  message: string;
+  type: string;
+}
+
+interface DashboardData {
+  quickStats?: {
+    todayRevenue: number;
+    monthRevenue: number;
+    lowStockCount: number;
+    todayTransactions: number;
+  };
+  inventorySummary?: {
+    totalValue: number;
+    totalItems: number;
+    totalStock: number;
+  };
+}
+
+interface SalesData {
+  summary?: {
+    totalSales: number;
+    totalTransactions: number;
+    totalItems: number;
+    averageTransactionValue: number;
+  };
+  recentSales?: Array<{
+    invoiceNumber?: string;
+    customerName?: string;
+    grandTotal: number;
+    createdAt?: string;
+  }>;
+}
+
+interface InventoryData {
+  summary?: {
+    totalItems: number;
+    totalStock: number;
+    totalValue: number;
+    averageStockValue: number;
+  };
+  lowStockItems?: Array<{
+    name?: string;
+    category?: string;
+    stock?: number;
+  }>;
+}
+
+interface PurchasesData {
+  summary?: {
+    totalSpent: number;
+    totalItems: number;
+    totalPurchases: number;
+    averagePurchaseValue: number;
+  };
+  statusDistribution?: {
+    received: number;
+    pending: number;
+    partial: number;
+    cancelled: number;
+  };
+}
+
+interface FinancialData {
+  summary?: {
+    totalRevenue: number;
+    totalCost: number;
+    grossProfit: number;
+    profitMargin: number;
+  };
+  keyMetrics?: {
+    totalTransactions: number;
+    totalPurchases: number;
+    totalInventoryItems: number;
+  };
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  icon: JSX.Element;
+  color: string;
+  trend?: string;
+  subtitle?: string;
+}
+
+interface SummaryCardProps {
+  label: string;
+  value: number | string;
+  icon: JSX.Element;
+}
+
+interface StatusCardProps {
+  title: string;
+  value: number;
+  color: string;
+}
+
 export default function ReportsPage() {
   const router = useRouter();
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState("Just now");
@@ -56,7 +154,7 @@ export default function ReportsPage() {
   }, []);
 
   // Show toast notification
-  const showToast = (message, type = "success") => {
+  const showToast = (message: string, type: string = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -108,15 +206,15 @@ export default function ReportsPage() {
     const data = reportData || {};
     switch (activeTab) {
       case "dashboard":
-        return <DashboardView data={data} />;
+        return <DashboardView data={data as DashboardData} />;
       case "sales":
-        return <SalesView data={data} />;
+        return <SalesView data={data as SalesData} />;
       case "inventory":
-        return <InventoryView data={data} />;
+        return <InventoryView data={data as InventoryData} />;
       case "purchases":
-        return <PurchasesView data={data} />;
+        return <PurchasesView data={data as PurchasesData} />;
       case "financial":
-        return <FinancialView data={data} />;
+        return <FinancialView data={data as FinancialData} />;
       default:
         return <div className="text-center py-12 text-gray-500">Select a report type</div>;
     }
@@ -223,7 +321,7 @@ export default function ReportsPage() {
 }
 
 // Dashboard View Component
-function DashboardView({ data }) {
+function DashboardView({ data }: { data: DashboardData }) {
   const safeData = data || {};
   
   return (
@@ -287,7 +385,7 @@ function DashboardView({ data }) {
 }
 
 // Sales View Component
-function SalesView({ data }) {
+function SalesView({ data }: { data: SalesData }) {
   const safeData = data || {};
   const recentSales = safeData.recentSales || [];
 
@@ -380,7 +478,7 @@ function SalesView({ data }) {
 }
 
 // Inventory View Component
-function InventoryView({ data }) {
+function InventoryView({ data }: { data: InventoryData }) {
   const safeData = data || {};
   const lowStockItems = safeData.lowStockItems || [];
 
@@ -456,7 +554,7 @@ function InventoryView({ data }) {
 }
 
 // Purchases View Component
-function PurchasesView({ data }) {
+function PurchasesView({ data }: { data: PurchasesData }) {
   const safeData = data || {};
 
   return (
@@ -523,7 +621,7 @@ function PurchasesView({ data }) {
 }
 
 // Financial View Component
-function FinancialView({ data }) {
+function FinancialView({ data }: { data: FinancialData }) {
   const safeData = data || {};
 
   return (
@@ -589,8 +687,8 @@ function FinancialView({ data }) {
 }
 
 // Reusable Components
-function MetricCard({ title, value, icon, color, trend, subtitle }) {
-  const colorClasses = {
+function MetricCard({ title, value, icon, color, trend, subtitle }: MetricCardProps) {
+  const colorClasses: Record<string, string> = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
     red: "from-red-500 to-red-600",
@@ -617,7 +715,7 @@ function MetricCard({ title, value, icon, color, trend, subtitle }) {
   );
 }
 
-function SummaryCard({ label, value, icon }) {
+function SummaryCard({ label, value, icon }: SummaryCardProps) {
   return (
     <div className="bg-gray-50 border border-gray-200 p-5 rounded-xl hover:bg-gray-100 transition-colors">
       <div className="flex items-center gap-3 mb-2">
@@ -629,8 +727,8 @@ function SummaryCard({ label, value, icon }) {
   );
 }
 
-function StatusCard({ title, value, color }) {
-  const colorClasses = {
+function StatusCard({ title, value, color }: StatusCardProps) {
+  const colorClasses: Record<string, string> = {
     green: "from-green-500 to-green-600 border-green-200",
     yellow: "from-yellow-500 to-yellow-600 border-yellow-200",
     blue: "from-blue-500 to-blue-600 border-blue-200",
