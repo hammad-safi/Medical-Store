@@ -275,6 +275,7 @@
 
 "use client"
 import { useQuery, useQueries } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import api from '@/app/lib/axios';
 import { useAuth } from './useAuth';
 
@@ -299,6 +300,7 @@ export interface SaleItem {
 }
 
 export interface Sale {
+  sellerId: any;
   _id: string;
   invoiceNumber: string;
   items: SaleItem[];
@@ -319,6 +321,8 @@ export interface PurchaseItem {
 }
 
 export interface Purchase {
+  totalQuantity: number;
+  supplierId: any;
   _id: string;
   invoiceNumber: string;
   items: PurchaseItem[];
@@ -330,6 +334,7 @@ export interface Purchase {
   paymentStatus: string;
   supplierName: string;
   createdAt: string;
+  purchaseDate?: string;
 }
 
 export interface Supplier {
@@ -355,8 +360,27 @@ export interface DashboardStats {
   totalSales: number;
 }
 
-// Safe array access helper
-const safeArray = (data) => Array.isArray(data) ? data : [];
+// Safe array access helper with proper typing
+const safeArray = <T,>(data: unknown): T[] => {
+  return Array.isArray(data) ? data as T[] : [];
+};
+
+// Type for dashboard stats calculations
+interface DashboardData {
+  stats: DashboardStats;
+  products: Product[];
+  sales: Sale[];
+  purchases: Purchase[];
+}
+
+// Type for report data
+interface ReportData {
+  dashboard: any;
+  sales: any;
+  inventory: any;
+  purchases: any;
+  financial: any;
+}
 
 // Central hook to fetch ALL application data
 export const useAppData = () => {
@@ -371,7 +395,7 @@ export const useAppData = () => {
         queryFn: async (): Promise<Product[]> => {
           try {
             const res = await api.get('/inventory', { params: { limit: 1000 } });
-            return safeArray(res.data?.data);
+            return safeArray<Product>(res.data?.data);
           } catch (error) {
             console.error('Error fetching inventory:', error);
             return [];
@@ -380,7 +404,7 @@ export const useAppData = () => {
         enabled: !!token,
         staleTime: 5 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
-        placeholderData: (previousData) => safeArray(previousData),
+        placeholderData: (previousData: unknown) => safeArray<Product>(previousData),
       },
       // Sales
       {
@@ -388,7 +412,7 @@ export const useAppData = () => {
         queryFn: async (): Promise<Sale[]> => {
           try {
             const res = await api.get('/sales', { params: { limit: 1000, lastDays: 30 } });
-            return safeArray(res.data?.data?.sales || res.data?.data);
+            return safeArray<Sale>(res.data?.data?.sales || res.data?.data);
           } catch (error) {
             console.error('Error fetching sales:', error);
             return [];
@@ -397,7 +421,7 @@ export const useAppData = () => {
         enabled: !!token,
         staleTime: 2 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
-        placeholderData: (previousData) => safeArray(previousData),
+        placeholderData: (previousData: unknown) => safeArray<Sale>(previousData),
       },
       // Purchases
       {
@@ -405,7 +429,7 @@ export const useAppData = () => {
         queryFn: async (): Promise<Purchase[]> => {
           try {
             const res = await api.get('/purchases', { params: { limit: 1000, lastDays: 30 } });
-            return safeArray(res.data?.data?.purchases || res.data?.data);
+            return safeArray<Purchase>(res.data?.data?.purchases || res.data?.data);
           } catch (error) {
             console.error('Error fetching purchases:', error);
             return [];
@@ -414,7 +438,7 @@ export const useAppData = () => {
         enabled: !!token,
         staleTime: 2 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
-        placeholderData: (previousData) => safeArray(previousData),
+        placeholderData: (previousData: unknown) => safeArray<Purchase>(previousData),
       },
       // Suppliers
       {
@@ -422,7 +446,7 @@ export const useAppData = () => {
         queryFn: async (): Promise<Supplier[]> => {
           try {
             const res = await api.get('/suppliers', { params: { limit: 1000 } });
-            return safeArray(res.data?.data?.suppliers || res.data?.data);
+            return safeArray<Supplier>(res.data?.data?.suppliers || res.data?.data);
           } catch (error) {
             console.error('Error fetching suppliers:', error);
             return [];
@@ -431,7 +455,7 @@ export const useAppData = () => {
         enabled: !!token,
         staleTime: 10 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
-        placeholderData: (previousData) => safeArray(previousData),
+        placeholderData: (previousData: unknown) => safeArray<Supplier>(previousData),
       },
     ],
   });
@@ -459,15 +483,15 @@ export const useAppData = () => {
   };
 
   // Invalidate all data (for mutations)
-  const invalidateAll = (queryClient) => {
+  const invalidateAll = (queryClient: any) => {
     queryClient.invalidateQueries({ queryKey: ['app-data'] });
   };
 
   // Safe data access
-  const products = safeArray(inventoryQuery.data);
-  const sales = safeArray(salesQuery.data);
-  const purchases = safeArray(purchasesQuery.data);
-  const suppliers = safeArray(suppliersQuery.data);
+  const products = safeArray<Product>(inventoryQuery.data);
+  const sales = safeArray<Sale>(salesQuery.data);
+  const purchases = safeArray<Purchase>(purchasesQuery.data);
+  const suppliers = safeArray<Supplier>(suppliersQuery.data);
 
   return {
     // Data with safe defaults
@@ -546,14 +570,18 @@ export const useSuppliersData = () => {
   };
 };
 
-// Safe reduce helper
-const safeReduce = (array, callback, initialValue) => {
+// Safe reduce helper with proper typing
+const safeReduce = <T, U>(
+  array: T[] | undefined,
+  callback: (accumulator: U, currentValue: T, currentIndex: number, array: T[]) => U,
+  initialValue: U
+): U => {
   if (!Array.isArray(array)) return initialValue;
   return array.reduce(callback, initialValue);
 };
 
 // Safe date helper
-const safeDateCheck = (dateString) => {
+const safeDateCheck = (dateString: string | undefined): boolean => {
   if (!dateString) return false;
   try {
     const date = new Date(dateString);
@@ -564,17 +592,17 @@ const safeDateCheck = (dateString) => {
 };
 
 // Dashboard-specific calculations with safe handling
-export const useDashboardData = () => {
+export const useDashboardData = (): DashboardData => {
   const { products, sales, purchases } = useAppData();
   
   // Ensure arrays are safe
-  const safeProducts = safeArray(products);
-  const safeSales = safeArray(sales);
-  const safePurchases = safeArray(purchases);
+  const safeProducts = safeArray<Product>(products);
+  const safeSales = safeArray<Sale>(sales);
+  const safePurchases = safeArray<Purchase>(purchases);
   
-  const stats = {
+  const stats: DashboardStats = {
     totalProducts: safeProducts.length,
-    totalRevenue: safeReduce(safeSales, (sum, sale) => {
+    totalRevenue: safeReduce<Sale, number>(safeSales, (sum, sale) => {
       if (!sale || typeof sale !== 'object') return sum;
       return sum + (sale.grandTotal || 0);
     }, 0),
@@ -593,19 +621,19 @@ export const useDashboardData = () => {
       
       return expiryDate <= threeMonthsLater && expiryDate >= today;
     }).length,
-    totalStockValue: safeReduce(safeProducts, (sum, item) => {
+    totalStockValue: safeReduce<Product, number>(safeProducts, (sum, item) => {
       if (!item || typeof item !== 'object') return sum;
       const costPrice = item.costPrice || item.price || 0;
       const stock = item.stock || 0;
       return sum + (costPrice * stock);
     }, 0),
     averageProductPrice: safeProducts.length > 0 
-      ? safeReduce(safeProducts, (sum, item) => {
+      ? safeReduce<Product, number>(safeProducts, (sum, item) => {
           if (!item || typeof item !== 'object') return sum;
           return sum + (item.salePrice || item.price || 0);
         }, 0) / safeProducts.length 
       : 0,
-    totalUnitsInStock: safeReduce(safeProducts, (sum, item) => {
+    totalUnitsInStock: safeReduce<Product, number>(safeProducts, (sum, item) => {
       if (!item || typeof item !== 'object') return sum;
       return sum + (item.stock || 0);
     }, 0),
@@ -621,14 +649,20 @@ export const useDashboardData = () => {
   };
 };
 
+// Type for product sales data in reports
+interface ProductSalesData {
+  quantity: number;
+  revenue: number;
+}
+
 // Reports-specific data calculations with safe handling
-export const useReportsData = () => {
+export const useReportsData = (): ReportData => {
   const { products, sales, purchases } = useAppData();
   
   // Ensure arrays are safe
-  const safeProducts = safeArray(products);
-  const safeSales = safeArray(sales);
-  const safePurchases = safeArray(purchases);
+  const safeProducts = safeArray<Product>(products);
+  const safeSales = safeArray<Sale>(sales);
+  const safePurchases = safeArray<Purchase>(purchases);
 
   // Calculate dashboard stats
   const dashboardStats = useMemo(() => {
@@ -643,7 +677,7 @@ export const useReportsData = () => {
       const saleDate = new Date(sale.createdAt);
       return saleDate >= startOfDay;
     });
-    const todayRevenue = safeReduce(todaySales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
+    const todayRevenue = safeReduce<Sale, number>(todaySales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
 
     // This month's sales
     const monthSales = safeSales.filter(sale => {
@@ -651,7 +685,7 @@ export const useReportsData = () => {
       const saleDate = new Date(sale.createdAt);
       return saleDate >= startOfMonth;
     });
-    const monthRevenue = safeReduce(monthSales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
+    const monthRevenue = safeReduce<Sale, number>(monthSales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
 
     // Low stock items
     const lowStockItems = safeProducts
@@ -681,12 +715,20 @@ export const useReportsData = () => {
         name: item.name || 'Unknown Product',
         expiry: item.expiry,
         stock: item.stock || 0,
-        daysUntilExpiry: Math.ceil((new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24))
+        // daysUntilExpiry: Math.ceil((new Date(item.expiry) - new Date()) / (1000 * 60 * 60 * 24))
+       daysUntilExpiry: item.expiry
+  ? Math.ceil(
+      (new Date(item.expiry).getTime() - Date.now()) 
+      / (1000 * 60 * 60 * 24)
+    )
+  : 0
+
+
       }))
       .slice(0, 5);
 
     // Inventory value
-    const inventoryValue = safeReduce(safeProducts, (sum, item) => {
+    const inventoryValue = safeReduce<Product, number>(safeProducts, (sum, item) => {
       return sum + ((item.stock || 0) * (item.costPrice || 0));
     }, 0);
 
@@ -702,7 +744,7 @@ export const useReportsData = () => {
       expiringItems,
       inventorySummary: {
         totalItems: safeProducts.length,
-        totalStock: safeReduce(safeProducts, (sum, item) => sum + (item.stock || 0), 0),
+        totalStock: safeReduce<Product, number>(safeProducts, (sum, item) => sum + (item.stock || 0), 0),
         totalValue: inventoryValue
       }
     };
@@ -710,14 +752,14 @@ export const useReportsData = () => {
 
   // Sales report calculations
   const salesReport = useMemo(() => {
-    const totalSales = safeReduce(safeSales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
-    const totalItems = safeReduce(safeSales, (sum, sale) => {
+    const totalSales = safeReduce<Sale, number>(safeSales, (sum, sale) => sum + (sale.grandTotal || 0), 0);
+    const totalItems = safeReduce<Sale, number>(safeSales, (sum, sale) => {
       if (!sale.items || !Array.isArray(sale.items)) return sum;
-      return sum + safeReduce(sale.items, (itemSum, item) => itemSum + (item.quantity || 0), 0);
+      return sum + safeReduce<SaleItem, number>(sale.items, (itemSum, item) => itemSum + (item.quantity || 0), 0);
     }, 0);
 
     // Top selling products
-    const productSales = {};
+    const productSales: Record<string, ProductSalesData> = {};
     safeSales.forEach(sale => {
       if (!sale.items || !Array.isArray(sale.items)) return;
       
@@ -748,7 +790,7 @@ export const useReportsData = () => {
     // Recent sales
     const recentSales = [...safeSales]
       .filter(s => s && s.createdAt)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10);
 
     return {
@@ -765,9 +807,9 @@ export const useReportsData = () => {
 
   // Inventory report calculations
   const inventoryReport = useMemo(() => {
-    const totalValue = safeReduce(safeProducts, (sum, item) => 
+    const totalValue = safeReduce<Product, number>(safeProducts, (sum, item) => 
       sum + ((item.stock || 0) * (item.costPrice || 0)), 0);
-    const totalStock = safeReduce(safeProducts, (sum, item) => sum + (item.stock || 0), 0);
+    const totalStock = safeReduce<Product, number>(safeProducts, (sum, item) => sum + (item.stock || 0), 0);
     
     const today = new Date();
     const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -797,8 +839,12 @@ export const useReportsData = () => {
       .map(item => {
         let daysUntilExpiry = 0;
         try {
-          const expiryDate = new Date(item.expiry);
-          daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+          if (!item.expiry) return false;
+
+const expiryDate = new Date(item.expiry);
+
+          // const expiryDate = new Date(item.expiry);
+          daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         } catch {
           daysUntilExpiry = 0;
         }
@@ -826,14 +872,14 @@ export const useReportsData = () => {
 
   // Purchases report calculations
   const purchasesReport = useMemo(() => {
-    const totalSpent = safeReduce(safePurchases, (sum, purchase) => {
+    const totalSpent = safeReduce<Purchase, number>(safePurchases, (sum, purchase) => {
       if (!purchase || typeof purchase !== 'object') return sum;
       return sum + (purchase.grandTotal || 0);
     }, 0);
     
-    const totalItems = safeReduce(safePurchases, (sum, purchase) => {
+    const totalItems = safeReduce<Purchase, number>(safePurchases, (sum, purchase) => {
       if (!purchase || !purchase.items || !Array.isArray(purchase.items)) return sum;
-      return sum + safeReduce(purchase.items, (itemSum, item) => {
+      return sum + safeReduce<PurchaseItem, number>(purchase.items, (itemSum, item) => {
         if (!item) return itemSum;
         return itemSum + (item.quantity || 0);
       }, 0);
@@ -871,17 +917,17 @@ export const useReportsData = () => {
 
   // Financial report calculations
   const financialReport = useMemo(() => {
-    const totalRevenue = safeReduce(safeSales, (sum, sale) => {
+    const totalRevenue = safeReduce<Sale, number>(safeSales, (sum, sale) => {
       if (!sale || typeof sale !== 'object') return sum;
       return sum + (sale.grandTotal || 0);
     }, 0);
     
-    const totalCost = safeReduce(safePurchases, (sum, purchase) => {
+    const totalCost = safeReduce<Purchase, number>(safePurchases, (sum, purchase) => {
       if (!purchase || typeof purchase !== 'object') return sum;
       return sum + (purchase.grandTotal || 0);
     }, 0);
     
-    const inventoryValue = safeReduce(safeProducts, (sum, item) => {
+    const inventoryValue = safeReduce<Product, number>(safeProducts, (sum, item) => {
       if (!item || typeof item !== 'object') return sum;
       const stock = item.stock || 0;
       const costPrice = item.costPrice || 0;
@@ -917,8 +963,11 @@ export const useReportsData = () => {
   };
 };
 
+// Type for report types
+type ReportType = 'dashboard' | 'sales' | 'inventory' | 'purchases' | 'financial';
+
 // Custom hook for specific report data
-export const useReportData = (type = 'dashboard') => {
+export const useReportData = (type: ReportType = 'dashboard') => {
   const reportsData = useReportsData();
   const { isLoading, isFetching, isPreviousData, refreshAll } = useAppData();
 
@@ -940,7 +989,7 @@ export const useReportData = (type = 'dashboard') => {
 };
 
 // Helper function for empty report data
-const getEmptyReport = (type) => {
+const getEmptyReport = (type: ReportType) => {
   const emptySummary = {
     totalItems: 0,
     totalStock: 0,
@@ -1014,6 +1063,3 @@ const getEmptyReport = (type) => {
       return {};
   }
 };
-
-// Helper function for memoization (add this at the top if missing)
-import { useMemo } from 'react';

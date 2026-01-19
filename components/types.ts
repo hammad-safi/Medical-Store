@@ -83,7 +83,7 @@ export interface ApiResponse<T = any> {
 }
 export interface ToastType {
   message: string;
-  type: "success" | "error" | "info";
+  type: "success" | "error" | "info" | "warning";
 }
 export interface Product {
   _id: string;
@@ -117,7 +117,7 @@ export interface Purchase {
 
 export interface Sale {
   _id: string;
-  productId: Product;
+  productId: string;
   quantity: number;
   sellingPrice: number;
   totalPrice: number;
@@ -127,5 +127,5 @@ export interface Sale {
 
 export interface ToastType {
   message: string;
-  type: "success" | "error" | "info";
+  type: "success" | "error" | "info" | "warning";
 }

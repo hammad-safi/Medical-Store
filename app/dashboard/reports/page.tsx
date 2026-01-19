@@ -117,10 +117,20 @@ interface StatusCardProps {
   color: string;
 }
 
+type ReportType =
+  | "dashboard"
+  | "sales"
+  | "inventory"
+  | "purchases"
+  | "financial";
+
+
 export default function ReportsPage() {
   const router = useRouter();
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState<ReportType>("dashboard");
+
   const [toast, setToast] = useState<Toast | null>(null);
   const [exporting, setExporting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -194,13 +204,21 @@ export default function ReportsPage() {
     );
   }
 
-  const tabs = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "sales", label: "Sales", icon: DollarSign },
-    { id: "inventory", label: "Inventory", icon: Package },
-    { id: "purchases", label: "Purchases", icon: ShoppingCart },
-    { id: "financial", label: "Financial", icon: CreditCard }
-  ];
+  // const tabs = [
+  //   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  //   { id: "sales", label: "Sales", icon: DollarSign },
+  //   { id: "inventory", label: "Inventory", icon: Package },
+  //   { id: "purchases", label: "Purchases", icon: ShoppingCart },
+  //   { id: "financial", label: "Financial", icon: CreditCard }
+  // ];
+  const tabs: { id: ReportType; label: string; icon: any }[] = [
+  { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "sales", label: "Sales", icon: DollarSign },
+  { id: "inventory", label: "Inventory", icon: Package },
+  { id: "purchases", label: "Purchases", icon: ShoppingCart },
+  { id: "financial", label: "Financial", icon: CreditCard },
+];
+
 
   const renderContent = () => {
     const data = reportData || {};

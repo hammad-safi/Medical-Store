@@ -195,7 +195,7 @@
 
 "use client";
 import { useState } from "react";
-import { Search, Boxes, Plus, Filter, SortAsc, ShoppingCart } from "lucide-react";
+import { Search, Boxes, Plus, Filter, SortAsc, ShoppingCart, RefreshCw, Trash2 } from "lucide-react";
 
 interface DataTableHeaderProps {
   title: string;
@@ -214,7 +214,11 @@ interface DataTableHeaderProps {
   onQuickSale?: () => void;
   onQuickPurchase?: () => void;
   onBulkSale?: () => void;
+  onBulkDelete?: () => void; // Added
+  onRefresh?: () => void; // Added
+  isRefreshing?: boolean; // Added
   selectedCount?: number;
+  sortOptions?: { value: string; label: string }[]; // Added
 }
 
 export default function DataTableHeader({
@@ -234,7 +238,17 @@ export default function DataTableHeader({
   onQuickSale,
   onQuickPurchase,
   onBulkSale,
+  onBulkDelete,
+  onRefresh,
+  isRefreshing = false,
   selectedCount = 0,
+  sortOptions = [
+    { value: "name", label: "Sort by Name" },
+    { value: "stock", label: "Sort by Stock" },
+    { value: "expiry", label: "Sort by Expiry" },
+    { value: "price", label: "Sort by Price" },
+    { value: "profit", label: "Sort by Profit Margin" }
+  ],
 }: DataTableHeaderProps) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -258,6 +272,18 @@ export default function DataTableHeader({
 
         {/* Buttons Section */}
         <div className="flex flex-wrap gap-2 justify-end items-center">
+          {/* Bulk Delete */}
+          {selectedCount > 0 && onBulkDelete && (
+            <button
+              onClick={onBulkDelete}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all hover:bg-red-700 relative text-sm sm:text-base"
+            >
+              <Trash2 size={18} />
+              Delete Selected
+              <span className="ml-1 font-bold">({selectedCount})</span>
+            </button>
+          )}
+
           {/* Bulk Sale */}
           {selectedCount > 0 && onBulkSale && (
             <button
@@ -290,24 +316,27 @@ export default function DataTableHeader({
             </button>
           )}
 
+          {/* Refresh Button */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 text-white rounded-xl font-semibold hover:shadow-lg transition-all hover:bg-white/30 disabled:opacity-50 text-sm sm:text-base"
+            >
+              <RefreshCw size={18} className={isRefreshing ? "animate-spin" : ""} />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </button>
+          )}
+
           {/* Add New */}
-          {/* {showAddButton && onAdd && (
+          {showAddButton && onAdd && (
             <button
               onClick={onAdd}
-              className="flex items-center gap-2 px-5 py-2 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 text-sm sm:text-base"
+              className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 text-sm sm:text-base min-w-[180px] justify-center"
             >
               <Plus size={18} /> Add New
             </button>
-          )} */}
-          {showAddButton && onAdd && (
-  <button
-    onClick={onAdd}
-    className="flex items-center gap-2 px-6 py-2 bg-white text-blue-600 rounded-xl font-semibold hover:shadow-lg transition-all hover:scale-105 text-sm sm:text-base min-w-[180px] justify-center"
-  >
-    <Plus size={18} /> Add New
-  </button>
-)}
-
+          )}
 
           {/* Export */}
           {onExport && (
@@ -366,29 +395,31 @@ export default function DataTableHeader({
                 onChange={(e) => setSortBy(e.target.value)}
                 className="pl-10 pr-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none bg-white min-w-[150px]"
               >
-                <option value="name">Sort by Name</option>
-                <option value="stock">Sort by Stock</option>
-                <option value="expiry">Sort by Expiry</option>
-                <option value="price">Sort by Price</option>
-                <option value="profit">Sort by Profit Margin</option>
-              </select>
-            </div>
-
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="pl-10 pr-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none bg-white min-w-[150px]"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </div>
+
+            {categories.length > 0 && (
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="pl-10 pr-4 py-3 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none bg-white min-w-[150px]"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       </div>

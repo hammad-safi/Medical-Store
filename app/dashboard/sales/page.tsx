@@ -77,16 +77,23 @@ const useSales = (page: number = 1, limit: number = 10, search: string = "") => 
   });
 
   // Filter and paginate sales locally
-  const filteredSales = useMemo(() => {
-    return allSales.filter(sale => {
-      const productNames = sale.items?.map((item: { productName: any; }) => item.productName).join(", ") || "";
-      return (
-        (sale.customerName?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        (sale.invoiceNumber?.toLowerCase() || "").includes(search.toLowerCase()) ||
-        productNames.toLowerCase().includes(search.toLowerCase())
-      );
-    });
-  }, [allSales, search]);
+const filteredSales = useMemo(() => {
+  const q = search.toLowerCase();
+
+  return allSales.filter(sale => {
+    const productNames =
+      sale.items?.map(item => item.productName).join(" ").toLowerCase() || "";
+
+    return (
+      sale.customerName?.toLowerCase().includes(q) ||
+      sale.invoiceNumber?.toLowerCase().includes(q) ||
+      sale.paymentMethod?.toLowerCase().includes(q) ||
+      sale.sellerId?.fullName?.toLowerCase().includes(q) ||
+      productNames.includes(q)
+    );
+  });
+}, [allSales, search]);
+
 
   // Sort by date (newest first)
   const sortedSales = useMemo(() => {

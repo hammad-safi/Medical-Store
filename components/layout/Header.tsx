@@ -1,26 +1,56 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, JSX } from "react";
 import { Bell, Menu, User, Settings, LogOut, Clock, Calendar, TrendingUp, ShoppingCart, Bug, TestTube, Package } from "lucide-react";
 import { useAuth } from "@/app/hooks/useAuth";
 import api from "@/app/lib/axios";
 
-export default function Header({ onMenuClick }) {
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { token, user } = useAuth();
-  const [sales, setSales] = useState([]);
-  const [purchaseCount, setPurchaseCount] = useState(0);
-  const [inventoryCount, setInventoryCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notificationStats, setNotificationStats] = useState({});
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const notificationsRef = useRef(null);
-  const userMenuRef = useRef(null);
+interface Notification {
+  _id: string;
+  title: string;
+  message: string;
+  type: string;
+  priority?: string;
+  isRead: boolean;
+  createdAt: string;
+  metadata?: {
+    invoiceNumber?: string;
+  };
+}
+
+interface NotificationStats {
+  total?: number;
+  unread?: number;
+  highPriority?: number;
+  todayCount?: number;
+}
+
+interface UserType {
+  fullName?: string;
+  role?: string;
+  email?: string;
+}
+
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
+  const { token, user } = useAuth() as { token: string | null; user: UserType | null };
+  const [sales, setSales] = useState<any[]>([]);
+  const [purchaseCount, setPurchaseCount] = useState<number>(0);
+  const [inventoryCount, setInventoryCount] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [notificationStats, setNotificationStats] = useState<NotificationStats>({});
+  const [loadingNotifications, setLoadingNotifications] = useState<boolean>(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Debug: Check what's happening
   useEffect(() => {
@@ -180,11 +210,6 @@ export default function Header({ onMenuClick }) {
         setInventoryCount(inventoryData.length);
         
         console.log(`📦 Total Inventory Items: ${inventoryData.length}`);
-        
-        // If you want to show total stock quantity instead of item count:
-        // const totalStock = inventoryData.reduce((sum, item) => sum + (item.stock || 0), 0);
-        // console.log(`📦 Total Stock Quantity: ${totalStock}`);
-        // setInventoryCount(totalStock);
       }
     } catch (error) {
       console.error("❌ Error fetching inventory:", error);
@@ -222,7 +247,7 @@ export default function Header({ onMenuClick }) {
   }, [token, fetchNotifications, fetchNotificationStats, fetchPurchaseLength, fetchInventory]);
 
   // Mark notification as read
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (notificationId: string) => {
     console.log(`📝 Marking notification ${notificationId} as read...`);
     
     try {
@@ -259,10 +284,10 @@ export default function Header({ onMenuClick }) {
   };
 
   // Format notification time
-  const formatNotificationTime = (dateString) => {
+  const formatNotificationTime = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffMs = now - date;
+    const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
@@ -279,7 +304,7 @@ export default function Header({ onMenuClick }) {
   };
 
   // Get priority badge color
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = (priority: string): string => {
     switch (priority) {
       case 'CRITICAL': return 'bg-red-100 text-red-800 border-red-200';
       case 'HIGH': return 'bg-orange-100 text-orange-800 border-orange-200';
@@ -290,7 +315,7 @@ export default function Header({ onMenuClick }) {
   };
 
   // Get icon based on notification type
-  const getNotificationIcon = (type) => {
+  const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'INVENTORY_LOW_STOCK':
         return <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
@@ -322,11 +347,11 @@ export default function Header({ onMenuClick }) {
 
   // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setShowUserMenu(false);
       }
     };
@@ -335,7 +360,7 @@ export default function Header({ onMenuClick }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const formatDate = (date) => {
+  const formatDate = (date: Date): string => {
     return date.toLocaleDateString('en-US', { 
       weekday: 'short', 
       month: 'short', 
@@ -344,7 +369,7 @@ export default function Header({ onMenuClick }) {
     });
   };
 
-  const formatTime = (date) => {
+  const formatTime = (date: Date): string => {
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
       minute: '2-digit',
@@ -414,6 +439,65 @@ export default function Header({ onMenuClick }) {
       </button>
     </div>
   );
+
+  // Notification Item Component Props
+  interface NotificationItemProps {
+    notification: Notification;
+    markAsRead: (id: string) => void;
+    getNotificationIcon: (type: string) => JSX.Element;
+    getPriorityColor: (priority: string) => string;
+    formatNotificationTime: (dateString: string) => string;
+  }
+
+  // Separate Notification Item Component for cleaner code
+  const NotificationItem = ({ 
+    notification, 
+    markAsRead, 
+    getNotificationIcon, 
+    getPriorityColor, 
+    formatNotificationTime 
+  }: NotificationItemProps) => {
+    return (
+      <div
+        className={`px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
+          !notification.isRead ? 'bg-blue-50' : ''
+        }`}
+        onClick={() => markAsRead(notification._id)}
+      >
+        <div className="flex items-start gap-3">
+          {getNotificationIcon(notification.type)}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-medium text-gray-900">{notification.title}</p>
+              {notification.priority && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full border ${getPriorityColor(notification.priority)}`}>
+                  {notification.priority}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-gray-700">{notification.message}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {formatNotificationTime(notification.createdAt)}
+            </p>
+            {notification.metadata?.invoiceNumber && (
+              <p className="text-xs text-gray-400 mt-1">
+                Invoice: {notification.metadata.invoiceNumber}
+              </p>
+            )}
+            {/* Debug info - visible only in development */}
+            {process.env.NODE_ENV === 'development' && (
+              <p className="text-xs text-gray-400 mt-1">
+                ID: {notification._id.substring(0, 8)}...
+              </p>
+            )}
+          </div>
+          {!notification.isRead && (
+            <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-2"></div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -687,53 +771,3 @@ export default function Header({ onMenuClick }) {
     </>
   );
 }
-
-// Separate Notification Item Component for cleaner code
-const NotificationItem = ({ 
-  notification, 
-  markAsRead, 
-  getNotificationIcon, 
-  getPriorityColor, 
-  formatNotificationTime 
-}) => {
-  return (
-    <div
-      className={`px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors cursor-pointer ${
-        !notification.isRead ? 'bg-blue-50' : ''
-      }`}
-      onClick={() => markAsRead(notification._id)}
-    >
-      <div className="flex items-start gap-3">
-        {getNotificationIcon(notification.type)}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-sm font-medium text-gray-900">{notification.title}</p>
-            {notification.priority && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full border ${getPriorityColor(notification.priority)}`}>
-                {notification.priority}
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-gray-700">{notification.message}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {formatNotificationTime(notification.createdAt)}
-          </p>
-          {notification.metadata?.invoiceNumber && (
-            <p className="text-xs text-gray-400 mt-1">
-              Invoice: {notification.metadata.invoiceNumber}
-            </p>
-          )}
-          {/* Debug info - visible only in development */}
-          {process.env.NODE_ENV === 'development' && (
-            <p className="text-xs text-gray-400 mt-1">
-              ID: {notification._id.substring(0, 8)}...
-            </p>
-          )}
-        </div>
-        {!notification.isRead && (
-          <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-2"></div>
-        )}
-      </div>
-    </div>
-  );
-};

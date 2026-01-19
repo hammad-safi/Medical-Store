@@ -901,7 +901,7 @@
 // }
 
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   X,
   Search,
@@ -955,6 +955,8 @@ interface Props {
   onClose: () => void;
   onSubmit: (data: SaleFormData) => Promise<any>;
   preSelectedProducts?: Product[] | null;
+  onPrintInvoice?: (saleId: string) => void; // Added
+  isSubmitting?: boolean; // Added
 }
 
 const PAYMENT_METHODS = [
@@ -965,7 +967,14 @@ const PAYMENT_METHODS = [
 ];
 
 /* ========================================================= */
-export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: Props) {
+export function AddSaleModal({ 
+  open, 
+  onClose, 
+  onSubmit, 
+  preSelectedProducts,
+  onPrintInvoice,
+  isSubmitting = false // Added with default value
+}: Props) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -1222,7 +1231,7 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
         item.unitPrice = price;
         item.total = item.quantity * price;
       } else {
-(item as any)[field] = value;
+        (item as any)[field] = value;
       }
 
       updatedItems[index] = item;
@@ -1250,6 +1259,11 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
       const res = await onSubmit(form);
       setSaleResponse(res);
       setShowInvoice(true);
+      
+      // Call onPrintInvoice callback if provided
+      if (onPrintInvoice && res?.data?._id) {
+        onPrintInvoice(res.data._id);
+      }
     } catch (error) {
       console.error("Error submitting:", error);
       setErrors({ submit: "Failed to record sale" });
@@ -1489,10 +1503,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={form.items.length === 0 || submitting}
+                disabled={form.items.length === 0 || submitting || isSubmitting}
                 className="px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 shadow-md"
               >
-                {submitting ? (
+                {(submitting || isSubmitting) ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                     Processing...
@@ -1526,9 +1540,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search product name..."
-                    className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+                    className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    disabled={submitting || isSubmitting}
                   />
-                  {suggestions.length > 0 && (
+                  {suggestions.length > 0 && !submitting && !isSubmitting && (
                     <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto">
                       {suggestions.map((product) => (
                         <div
@@ -1568,7 +1583,8 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                     placeholder="Customer Name"
                     value={form.customerName}
                     onChange={(e) => setForm((prev) => ({ ...prev, customerName: e.target.value }))}
-                    className="w-full px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    className="w-full px-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    disabled={submitting || isSubmitting}
                   />
                   <div className="relative">
                     <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -1577,7 +1593,8 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                       placeholder="Phone Number"
                       value={form.customerPhone}
                       onChange={(e) => setForm((prev) => ({ ...prev, customerPhone: e.target.value }))}
-                      className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      disabled={submitting || isSubmitting}
                     />
                   </div>
                 </div>
@@ -1585,7 +1602,7 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
             </div>
 
             {/* Selected Product Form */}
-            {selectedProduct && (
+            {selectedProduct && !submitting && !isSubmitting && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
@@ -1595,6 +1612,7 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                         type="button"
                         onClick={() => setNewItem((prev) => ({ ...prev, quantity: Math.max(1, prev.quantity - 1) }))}
                         className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 transition-colors"
+                        disabled={submitting || isSubmitting}
                       >
                         <Minus size={14} />
                       </button>
@@ -1610,9 +1628,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                             }));
                           }
                         }}
-                        className="w-full px-2 py-1.5 text-center border-x border-gray-300 focus:outline-none text-sm"
+                        className="w-full px-2 py-1.5 text-center border-x border-gray-300 focus:outline-none text-sm disabled:bg-gray-50"
                         min="1"
                         max={selectedProduct.stock}
+                        disabled={submitting || isSubmitting}
                       />
                       <button
                         type="button"
@@ -1621,6 +1640,7 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                           quantity: Math.min(selectedProduct.stock, prev.quantity + 1),
                         }))}
                         className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 transition-colors"
+                        disabled={submitting || isSubmitting}
                       >
                         <Plus size={14} />
                       </button>
@@ -1633,9 +1653,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                       type="number"
                       value={newItem.unitPrice}
                       onChange={(e) => setNewItem((prev) => ({ ...prev, unitPrice: parseFloat(e.target.value) || 0 }))}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-50"
                       step="0.01"
                       min="0"
+                      disabled={submitting || isSubmitting}
                     />
                   </div>
 
@@ -1643,7 +1664,8 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                     <button
                       type="button"
                       onClick={addItem}
-                      className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm"
+                      className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={submitting || isSubmitting}
                     >
                       <Plus size={14} />
                       Add Item
@@ -1660,9 +1682,8 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
               </div>
             )}
 
-            {/* Items List - Always show table header */}
+            {/* Items List */}
             <div className="min-h-[180px]">
-              {/* Always show table container with header */}
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className={`${form.items.length > 0 ? 'max-h-[180px]' : 'max-h-[60px]'} overflow-y-auto`}>
                   <table className="w-full text-sm">
@@ -1685,8 +1706,9 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                                 type="number"
                                 value={item.quantity}
                                 onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                                className="w-16 px-2 py-1 border rounded text-center text-sm"
+                                className="w-16 px-2 py-1 border rounded text-center text-sm disabled:bg-gray-50"
                                 min="1"
+                                disabled={submitting || isSubmitting}
                               />
                             </td>
                             <td className="p-3 text-right">
@@ -1694,9 +1716,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                                 type="number"
                                 value={item.unitPrice}
                                 onChange={(e) => updateItem(index, "unitPrice", e.target.value)}
-                                className="w-20 px-2 py-1 border rounded text-right text-sm"
+                                className="w-20 px-2 py-1 border rounded text-right text-sm disabled:bg-gray-50"
                                 step="0.01"
                                 min="0"
+                                disabled={submitting || isSubmitting}
                               />
                             </td>
                             <td className="p-3 text-right font-semibold text-green-700">
@@ -1706,7 +1729,8 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                               <button
                                 type="button"
                                 onClick={() => removeItem(index)}
-                                className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
+                                className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={submitting || isSubmitting}
                               >
                                 <Trash2 size={18} />
                               </button>
@@ -1754,10 +1778,11 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                           discount: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 
                         }))}
                         placeholder="0"
-                        className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-50"
                         min="0"
                         max="100"
                         step="0.1"
+                        disabled={submitting || isSubmitting}
                       />
                     </div>
                     {form.discount > 0 && (
@@ -1779,9 +1804,10 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                           tax: e.target.value === "" ? 0 : parseFloat(e.target.value) || 0 
                         }))}
                         placeholder="0"
-                        className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full pl-10 pr-4 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-50"
                         min="0"
                         step="0.1"
+                        disabled={submitting || isSubmitting}
                       />
                     </div>
                     {form.tax > 0 && (
@@ -1802,11 +1828,12 @@ export function AddSaleModal({ open, onClose, onSubmit, preSelectedProducts }: P
                       key={name}
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, paymentMethod: name }))}
-                      className={`py-2 px-3 rounded-lg border flex items-center justify-center gap-2 text-xs font-medium transition-all ${
+                      className={`py-2 px-3 rounded-lg border flex items-center justify-center gap-2 text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         form.paymentMethod === name
                           ? "bg-blue-600 text-white border-blue-600 shadow-md"
                           : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
+                      disabled={submitting || isSubmitting}
                     >
                       <Icon size={14} />
                       {name}

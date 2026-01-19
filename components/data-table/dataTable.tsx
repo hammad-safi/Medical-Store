@@ -813,15 +813,17 @@
 //   );
 // }
 "use client";
-import React from "react";
-import { AlertCircle, Clock, Edit, Eye, Package, ShoppingCart, TrendingUp, MoreVertical, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
+import { AlertCircle, Clock, Edit, Eye, Package, ShoppingCart, TrendingUp, MoreVertical } from "lucide-react";
 
 interface DataTableProps {
-  columns: { key: string; label: string; type?: 'text' | 'number' | 'date' | 'currency' |'badge'| 'status' | 'action' }[];
+
+  columns: { key: string; label: string; type?: 'text' | 'number' | 'date' | 'currency' | 'badge' | 'status' | 'action' }[];
   data: any[];
-  selected: string[];
-  setSelected: (ids: string[]) => void;
+     selected: string[];
+  setSelected: React.Dispatch<React.SetStateAction<string[]>>;
+  // selected: string[];
+  // setSelected: (ids: string[]) => void;
   onEdit?: (item: any) => void;
   onView: (item: any) => void;
   onQuickSale?: (item: any) => void;
@@ -835,7 +837,6 @@ interface DataTableProps {
     onClick: (item: any) => void;
     variant?: 'default' | 'danger';
   }>;
-  // Add these new props for server-side pagination
   pagination?: {
     currentPage: number;
     totalPages: number;
@@ -860,18 +861,16 @@ export default function DataTable({
   customActions,
   showRowMenu = false,
   rowMenuItems = [],
-  pagination, // New prop
-  loading = false // New prop
+  pagination,
+  loading = false
 }: DataTableProps) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [rowMenuOpen, setRowMenuOpen] = useState<string | null>(null);
   
-  // Keep local state only if no server-side pagination provided
   const [rowsPerPage, setRowsPerPage] = useState(pagination?.itemsPerPage || 10);
   const [currentPage, setCurrentPage] = useState(pagination?.currentPage || 1);
 
-  // Use server-side pagination data if provided, otherwise use local slicing
-  const displayData = data; // Don't slice - backend already gives us the right page
+  const displayData = data;
 
   const toggleRow = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
@@ -900,6 +899,7 @@ export default function DataTable({
         return `$${parseFloat(value).toFixed(2)}`;
       case 'number':
         return Number(value).toLocaleString();
+      case 'badge':
       case 'status':
         const statusColors: Record<string, string> = {
           'active': 'bg-green-100 text-green-800',
@@ -910,6 +910,11 @@ export default function DataTable({
           'cancelled': 'bg-red-100 text-red-800',
           'partial': 'bg-yellow-100 text-yellow-800',
           'paid': 'bg-green-100 text-green-800',
+          'unpaid': 'bg-red-100 text-red-800',
+          // 'cancelled': 'bg-gray-100 text-gray-800',
+          'partially received': 'bg-yellow-100 text-yellow-800',
+          // 'pending': 'bg-yellow-100 text-yellow-800',
+          'draft': 'bg-gray-100 text-gray-800',
         };
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${statusColors[value.toLowerCase()] || 'bg-gray-100 text-gray-800'} whitespace-nowrap`}>
@@ -921,7 +926,6 @@ export default function DataTable({
     }
   };
 
-  // Handle page change
   const handlePageChange = (page: number) => {
     if (pagination) {
       pagination.onPageChange(page);
@@ -930,7 +934,6 @@ export default function DataTable({
     }
   };
 
-  // Handle rows per page change
   const handleRowsPerPageChange = (newRowsPerPage: number) => {
     setRowsPerPage(newRowsPerPage);
     setCurrentPage(1);
@@ -939,7 +942,6 @@ export default function DataTable({
     }
   };
 
-  // Calculate display values
   const currentPageToShow = pagination?.currentPage || currentPage;
   const rowsPerPageToShow = pagination?.itemsPerPage || rowsPerPage;
   const totalItemsToShow = pagination?.totalItems || data.length;
@@ -991,6 +993,7 @@ export default function DataTable({
                   style={{ 
                     width: col.type === 'action' ? '80px' : 
                            col.type === 'status' ? '100px' : 
+                           col.type === 'badge' ? '100px' :
                            col.type === 'date' ? '120px' :
                            col.type === 'currency' ? '120px' :
                            col.type === 'number' ? '100px' : '150px'
@@ -1029,7 +1032,7 @@ export default function DataTable({
                         return (
                           <td key={col.key} className="p-2">
                             <div className="flex items-center gap-1 truncate">
-                              <span className={`text-xs ${isLowStock ? "text-red-600 font-bold" : "text-gray-900"} truncate`} title={value}>
+                              <span className={`text-xs ${isLowStock ? "text-red-600 font-bold" : "text-gray-900"} truncate`} title={String(value)}>
                                 {value}
                               </span>
                               {isLowStock && <AlertCircle size={14} className="text-red-500 flex-shrink-0" />}
@@ -1039,12 +1042,13 @@ export default function DataTable({
                       }
 
                       if (col.key === 'expiry' || col.key.includes('expiry')) {
+                        const expiryDate = value ? new Date(value).toLocaleDateString() : 'N/A';
                         return (
                           <td key={col.key} className="p-2">
                             <div className="flex items-center gap-1 truncate">
                               <span className={`text-xs ${isExpiringSoon ? "text-orange-600 font-semibold" : "text-gray-900"} truncate`} 
-                                title={value ? new Date(value).toLocaleDateString() : 'N/A'}>
-                                {value ? new Date(value).toLocaleDateString() : 'N/A'}
+                                title={expiryDate}>
+                                {expiryDate}
                               </span>
                               {isExpiringSoon && <Clock size={14} className="text-orange-500 flex-shrink-0" />}
                             </div>
@@ -1053,25 +1057,27 @@ export default function DataTable({
                       }
 
                       if (col.key === 'salePrice' || col.key === 'costPrice' || col.key === 'unitPrice' || col.key === 'unitCost') {
+                        const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
                         return (
                           <td key={col.key} className="p-2 font-bold text-green-600 text-xs truncate" 
-                            title={`$${typeof value === 'number' ? value.toFixed(2) : value}`}>
-                            ${typeof value === 'number' ? value.toFixed(2) : value}
+                            title={`$${formattedValue}`}>
+                            ${formattedValue}
                           </td>
                         );
                       }
 
                       if (col.key === 'total' || col.key === 'grandTotal' || col.key === 'totalAmount') {
+                        const formattedValue = typeof value === 'number' ? value.toFixed(2) : value;
                         return (
                           <td key={col.key} className="p-2 font-bold text-blue-600 text-xs truncate"
-                            title={`$${typeof value === 'number' ? value.toFixed(2) : value}`}>
-                            ${typeof value === 'number' ? value.toFixed(2) : value}
+                            title={`$${formattedValue}`}>
+                            ${formattedValue}
                           </td>
                         );
                       }
 
                       if (col.key === 'profitMargin') {
-                        const margin = parseFloat(value) || 0;
+                        const margin = parseFloat(value as string) || 0;
                         return (
                           <td key={col.key} className="p-2">
                             <div className="flex items-center gap-1 truncate">
@@ -1086,7 +1092,7 @@ export default function DataTable({
                       }
 
                       return (
-                        <td key={col.key} className="p-2 text-xs truncate" title={formatValue(value, col.type)?.toString()}>
+                        <td key={col.key} className="p-2 text-xs truncate" title={String(formatValue(value, col.type))}>
                           {formatValue(value, col.type)}
                         </td>
                       );
@@ -1212,7 +1218,6 @@ export default function DataTable({
         </table>
       </div>
       
-      {/* Table Footer - Modified for server-side pagination */}
       <div className="px-4 py-3 border-t bg-gray-50 flex justify-between items-center">
         <div className="text-xs text-gray-600">
           Showing <span className="font-semibold">{startIndex}</span> to <span className="font-semibold">{endIndex}</span> of <span className="font-semibold">{totalItemsToShow}</span> entries
